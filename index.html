@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Songho — Multijoueur</title>
+<style>
+/* ── Variables ──────────────────────────────────────────────── */
+:root {
+  --bois-fonce:   #3B1F0A;
+  --bois-moyen:   #6B3A1F;
+  --bois-clair:   #A0622A;
+  --ocre:         #C87941;
+  --sable:        #E8C99A;
+  --creme:        #F5E9D0;
+  --or:           #D4A017;
+  --blanc-casse:  #FAF3E0;
+  --ombre:        rgba(0,0,0,0.35);
+  --nord-color:   #2A4D7A;
+  --sud-color:    #7A2A2A;
+  --vert:         #2E7D32;
+  --rouge:        #C62828;
+  --transition:   0.22s ease;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+
+body {
+  font-family:'Georgia','Times New Roman',serif;
+  background: var(--bois-fonce);
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(107,58,31,.4) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 50%, rgba(59,31,10,.6)  0%, transparent 60%);
+  min-height:100vh;
+  color:var(--creme);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  overflow-x:hidden;
+}
+.hidden { display:none !important; }
+
+/* ── Écrans ─────────────────────────────────────────────────── */
+.screen {
+  width:min(520px, 95vw);
+  background:linear-gradient(160deg, var(--bois-moyen), var(--bois-fonce));
+  border:2px solid var(--ocre);
+  border-radius:14px;
+  padding:2.2rem 2rem;
+  box-shadow:0 8px 40px var(--ombre);
+  text-align:center;
+}
+.screen-title {
+  font-size:2.6rem; font-weight:bold; color:var(--or);
+  letter-spacing:.08em; text-shadow:2px 3px 6px rgba(0,0,0,.6);
+  margin-bottom:.2rem;
+}
+.screen-sub {
+  font-size:.9rem; color:var(--sable); font-style:italic;
+  letter-spacing:.04em; margin-bottom:1.8rem;
+}
+.divider {
+  display:flex; align-items:center; gap:.75rem;
+  margin:1.2rem 0 .8rem; color:var(--ocre); font-size:.78rem;
+  letter-spacing:.1em; text-transform:uppercase;
+}
+.divider::before,.divider::after {
+  content:""; flex:1; height:1px;
+  background:linear-gradient(to right, transparent, var(--ocre), transparent);
+}
+
+/* ── Inputs & boutons ───────────────────────────────────────── */
+.input-field {
+  width:100%; padding:.7rem 1rem;
+  background:rgba(0,0,0,.25); border:1.5px solid var(--ocre);
+  border-radius:8px; color:var(--creme);
+  font-family:inherit; font-size:1rem; margin-bottom:.75rem;
+  transition:border-color var(--transition);
+}
+.input-field:focus { outline:none; border-color:var(--or); }
+.input-field::placeholder { color:rgba(232,201,154,.4); }
+
+.btn-primary {
+  width:100%; padding:.85rem;
+  background:linear-gradient(135deg, #C04B10, #8B2E0F);
+  border:none; border-radius:8px; color:var(--blanc-casse);
+  font-family:inherit; font-size:1.1rem; font-weight:bold;
+  letter-spacing:.05em; cursor:pointer;
+  box-shadow:0 4px 15px rgba(0,0,0,.4);
+  transition:transform var(--transition), box-shadow var(--transition);
+  margin-top:.5rem;
+}
+.btn-primary:hover { transform:translateY(-2px); box-shadow:0 7px 22px rgba(0,0,0,.5); }
+.btn-primary:active { transform:translateY(0); }
+
+.btn-secondary {
+  padding:.4rem 1rem; border:1.5px solid var(--ocre); border-radius:6px;
+  background:transparent; color:var(--sable);
+  font-family:inherit; font-size:.85rem; cursor:pointer;
+  transition:background var(--transition);
+}
+.btn-secondary:hover { background:rgba(200,121,65,.25); }
+
+/* ── URL à partager ─────────────────────────────────────────── */
+.share-box {
+  background:rgba(0,0,0,.3); border:1px solid var(--ocre);
+  border-radius:8px; padding:.75rem 1rem; margin-top:1rem;
+  display:flex; gap:.5rem; align-items:center;
+}
+.share-url {
+  flex:1; background:transparent; border:none; color:var(--sable);
+  font-family:'Courier New',monospace; font-size:.78rem; cursor:text;
+}
+.share-url:focus { outline:none; }
+.copy-btn {
+  padding:.35rem .8rem; background:var(--ocre); border:none;
+  border-radius:5px; color:var(--bois-fonce); font-weight:bold;
+  font-size:.8rem; cursor:pointer; white-space:nowrap;
+}
+.copy-btn:hover { background:var(--or); }
+
+/* ── Attente ─────────────────────────────────────────────────── */
+.waiting-anim {
+  margin:1.5rem auto;
+  display:flex; gap:.5rem; justify-content:center;
+}
+.waiting-anim span {
+  width:10px; height:10px; border-radius:50%;
+  background:var(--or); opacity:.3;
+  animation:pulse-dot 1.4s ease-in-out infinite;
+}
+.waiting-anim span:nth-child(2) { animation-delay:.2s; }
+.waiting-anim span:nth-child(3) { animation-delay:.4s; }
+@keyframes pulse-dot {
+  0%,80%,100% { opacity:.3; transform:scale(.8); }
+  40%          { opacity:1;  transform:scale(1.2); }
+}
+
+/* ── Zone de jeu ─────────────────────────────────────────────── */
+#screen-game {
+  width:min(760px, 97vw);
+  display:flex; flex-direction:column; gap:.8rem;
+  padding:1rem .5rem;
+}
+.game-header {
+  display:flex; align-items:center; justify-content:space-between;
+}
+.game-title { font-size:1.4rem; color:var(--or); letter-spacing:.06em; }
+
+/* ── Indicateurs de connexion ───────────────────────────────── */
+.players-bar {
+  display:flex; gap:.8rem;
+}
+.player-card {
+  flex:1; background:rgba(0,0,0,.3); border-radius:10px;
+  padding:.6rem .9rem; border:1.5px solid;
+  display:flex; align-items:center; gap:.6rem;
+}
+.player-card.north { border-color:var(--nord-color); }
+.player-card.south { border-color:var(--sud-color); }
+.player-card.me { box-shadow:0 0 12px rgba(212,160,23,.3); }
+
+.conn-dot {
+  width:9px; height:9px; border-radius:50%;
+  flex-shrink:0; transition:background .4s;
+}
+.conn-dot.online  { background:#4CAF50; box-shadow:0 0 6px #4CAF50; }
+.conn-dot.offline { background:#888; }
+.player-name { font-size:.85rem; font-weight:bold; color:var(--sable); flex:1; }
+.player-side-badge {
+  font-size:.7rem; padding:.15rem .45rem;
+  border-radius:4px; font-weight:bold;
+}
+.player-card.north .player-side-badge { background:var(--nord-color); color:#fff; }
+.player-card.south .player-side-badge { background:var(--sud-color); color:#fff; }
+
+/* ── Scores ──────────────────────────────────────────────────── */
+.score-panel { display:flex; gap:.8rem; }
+.score-card {
+  flex:1; background:rgba(0,0,0,.3); border-radius:10px;
+  padding:.65rem .9rem; border:1.5px solid;
+}
+.score-card.north { border-color:var(--nord-color); }
+.score-card.south { border-color:var(--sud-color); }
+.score-label { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em; }
+.score-card.north .score-label { color:#7EB3F0; }
+.score-card.south .score-label { color:#F08080; }
+.score-value { font-size:1.9rem; font-weight:bold; color:var(--or); }
+.score-bar-bg { height:5px; background:rgba(255,255,255,.1); border-radius:3px; margin-top:.4rem; overflow:hidden; }
+.score-bar { height:100%; border-radius:3px; transition:width .4s ease; }
+.score-card.north .score-bar { background:var(--nord-color); }
+.score-card.south .score-bar { background:var(--sud-color); }
+
+/* ── Indicateur de tour ──────────────────────────────────────── */
+.turn-indicator {
+  text-align:center; font-size:.95rem; font-style:italic;
+  padding:.45rem 1rem; border-radius:8px;
+}
+.turn-indicator.north { background:rgba(42,77,122,.25); color:#7EB3F0; border:1px solid rgba(42,77,122,.5); }
+.turn-indicator.south { background:rgba(122,42,42,.25); color:#F08080; border:1px solid rgba(122,42,42,.5); }
+.turn-indicator.waiting-opp { background:rgba(212,160,23,.1); color:var(--sable); border:1px solid rgba(212,160,23,.3); }
+
+/* ── Tablier ─────────────────────────────────────────────────── */
+.board {
+  background:linear-gradient(135deg, #5A3010, #3B1F0A);
+  border:3px solid var(--bois-clair); border-radius:20px;
+  padding:.9rem .65rem;
+  box-shadow:0 6px 30px var(--ombre), inset 0 1px 0 rgba(255,255,255,.07);
+  position:relative;
+}
+.board::before {
+  content:""; position:absolute; inset:0; border-radius:17px;
+  background:repeating-linear-gradient(88deg,transparent,transparent 18px,rgba(255,255,255,.018) 18px,rgba(255,255,255,.018) 19px);
+  pointer-events:none;
+}
+.player-label { text-align:center; font-size:.72rem; text-transform:uppercase; letter-spacing:.12em; margin-bottom:.4rem; }
+.player-label.north { color:#7EB3F0; }
+.player-label.south { color:#F08080; }
+.board-row { display:flex; justify-content:space-around; align-items:center; gap:.35rem; padding:.25rem 0; }
+.board-divider { height:2px; background:linear-gradient(to right,transparent,var(--bois-clair),transparent); margin:.35rem 0; opacity:.5; }
+
+/* ── Cases ───────────────────────────────────────────────────── */
+.pit {
+  width:clamp(58px,9.5vw,80px); height:clamp(58px,9.5vw,80px);
+  background:radial-gradient(circle at 35% 35%, #7A4A25, #3A1A05);
+  border:2px solid var(--bois-clair); border-radius:50%;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  cursor:pointer; position:relative;
+  transition:transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+  box-shadow:inset 0 3px 8px rgba(0,0,0,.5), 0 2px 4px rgba(0,0,0,.3);
+  user-select:none;
+}
+.pit:hover { transform:translateY(-3px); box-shadow:inset 0 3px 8px rgba(0,0,0,.5),0 6px 16px rgba(0,0,0,.4); }
+.pit.legal { border-color:var(--or); animation:pulse-legal 1.5s ease-in-out infinite; }
+@keyframes pulse-legal {
+  0%,100% { box-shadow:inset 0 3px 8px rgba(0,0,0,.5),0 0 8px rgba(212,160,23,.4); }
+  50%      { box-shadow:inset 0 3px 8px rgba(0,0,0,.5),0 0 20px rgba(212,160,23,.7); }
+}
+.pit.not-my-turn { cursor:default; }
+.pit.not-my-turn:hover { transform:none; }
+.pit.granary { background:radial-gradient(circle at 35% 35%, #9A6A35, #5A3010); border-color:var(--or); }
+.pit.last-moved { border-color:#80C0FF; box-shadow:inset 0 3px 8px rgba(0,0,0,.5),0 0 14px rgba(128,192,255,.6); }
+.pit.just-received { animation:receive-flash .3s ease-out; }
+@keyframes receive-flash {
+  0%   { box-shadow:inset 0 3px 8px rgba(0,0,0,.5),0 0 22px rgba(255,200,80,.9); }
+  100% { box-shadow:inset 0 3px 8px rgba(0,0,0,.5),0 2px 4px rgba(0,0,0,.3); }
+}
+@keyframes shake {
+  0%,100% { transform:translateX(0); }
+  20% { transform:translateX(-5px); }
+  40% { transform:translateX(5px); }
+  60% { transform:translateX(-4px); }
+  80% { transform:translateX(4px); }
+}
+.pit.shake { animation:shake .45s ease; }
+.pit.sowing-source { border-color:#FFD080; box-shadow:inset 0 3px 8px rgba(0,0,0,.5),0 0 18px rgba(255,200,80,.7); }
+
+.seeds-count { font-size:1.2rem; font-weight:bold; color:var(--or); line-height:1; z-index:1; }
+.seeds-visual { display:flex; flex-wrap:wrap; justify-content:center; gap:2px; max-width:90%; margin-top:2px; }
+.seed { width:6px; height:6px; background:radial-gradient(circle at 35% 35%, #E0A060, #7A4A10); border-radius:50%; display:inline-block; }
+.seed-overflow { font-size:.55rem; color:var(--sable); line-height:1; }
+
+/* ── Chat ────────────────────────────────────────────────────── */
+.chat-box {
+  background:rgba(0,0,0,.25); border:1.5px solid rgba(200,121,65,.4);
+  border-radius:10px; overflow:hidden;
+}
+.chat-header {
+  padding:.5rem .9rem; font-size:.75rem; text-transform:uppercase;
+  letter-spacing:.1em; color:var(--ocre); border-bottom:1px solid rgba(200,121,65,.3);
+  display:flex; align-items:center; gap:.5rem;
+}
+.chat-messages {
+  height:130px; overflow-y:auto; padding:.5rem .8rem;
+  display:flex; flex-direction:column; gap:.3rem;
+  scroll-behavior:smooth;
+}
+.chat-msg { font-size:.8rem; line-height:1.4; }
+.chat-msg.sys { color:var(--or); font-style:italic; text-align:center; }
+.chat-msg.north .msg-name { color:#7EB3F0; font-weight:bold; }
+.chat-msg.south .msg-name { color:#F08080; font-weight:bold; }
+.chat-msg .msg-text { color:var(--creme); }
+.chat-input-row {
+  display:flex; gap:.5rem; padding:.5rem .8rem;
+  border-top:1px solid rgba(200,121,65,.3);
+}
+.chat-input {
+  flex:1; background:rgba(0,0,0,.2); border:1px solid rgba(200,121,65,.4);
+  border-radius:6px; color:var(--creme); font-family:inherit; font-size:.82rem;
+  padding:.4rem .7rem;
+}
+.chat-input:focus { outline:none; border-color:var(--or); }
+.chat-send {
+  padding:.4rem .8rem; background:var(--ocre); border:none;
+  border-radius:6px; color:var(--bois-fonce); font-weight:bold; font-size:.82rem;
+  cursor:pointer;
+}
+.chat-send:hover { background:var(--or); }
+
+/* ── Légende ─────────────────────────────────────────────────── */
+.legend { display:flex; gap:1.2rem; justify-content:center; flex-wrap:wrap; font-size:.76rem; color:var(--sable); opacity:.75; }
+.legend-item { display:flex; align-items:center; gap:.4rem; }
+.legend-dot { width:9px; height:9px; border-radius:50%; border:1.5px solid; }
+.legend-dot.legal   { border-color:var(--or); background:rgba(212,160,23,.3); }
+.legend-dot.last    { border-color:#80C0FF; background:rgba(128,192,255,.2); }
+.legend-dot.granary { border-color:var(--or); background:rgba(154,106,53,.4); }
+
+/* ── Overlay fin ─────────────────────────────────────────────── */
+#end-overlay {
+  position:fixed; inset:0; background:rgba(30,10,2,.85);
+  display:flex; align-items:center; justify-content:center;
+  z-index:100; backdrop-filter:blur(4px);
+}
+.end-card {
+  background:linear-gradient(160deg, var(--bois-moyen), var(--bois-fonce));
+  border:2px solid var(--or); border-radius:14px;
+  padding:2.5rem 3rem; text-align:center;
+  box-shadow:0 10px 50px rgba(0,0,0,.7);
+  animation:pop-in .35s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes pop-in {
+  from { transform:scale(.7); opacity:0; }
+  to   { transform:scale(1);  opacity:1; }
+}
+.end-title  { font-size:2.2rem; color:var(--or); margin-bottom:.5rem; }
+.end-detail { font-size:1.1rem; color:var(--sable); margin-bottom:1.8rem; }
+
+/* ── Anim layer ──────────────────────────────────────────────── */
+#anim-layer { position:fixed; inset:0; pointer-events:none; z-index:200; }
+.flying-seed {
+  position:fixed; width:11px; height:11px;
+  background:radial-gradient(circle at 35% 35%, #FFD080, #C07020);
+  border-radius:50%; box-shadow:0 0 6px rgba(255,200,80,.8);
+  pointer-events:none; z-index:201; will-change:transform,opacity;
+}
+
+/* ── Notification ─────────────────────────────────────────────── */
+.notif {
+  position:fixed; top:1rem; right:1rem; z-index:300;
+  background:rgba(212,160,23,.15); border:1px solid var(--or);
+  border-radius:8px; padding:.6rem 1rem; font-size:.85rem;
+  color:var(--or); backdrop-filter:blur(6px);
+  animation:slide-in .3s ease; max-width:260px;
+}
+@keyframes slide-in {
+  from { opacity:0; transform:translateX(40px); }
+  to   { opacity:1; transform:translateX(0); }
+}
+
+/* ── Mobile ───────────────────────────────────────────────────── */
+@media(max-width:500px) {
+  .screen-title { font-size:2rem; }
+  .pit { width:clamp(42px,12vw,58px); height:clamp(42px,12vw,58px); }
+  .seeds-count { font-size:1rem; }
+  .chat-messages { height:100px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ ÉCRAN ACCUEIL ════════════════════════════════════════════ -->
+<div id="screen-home" class="screen">
+  <h1 class="screen-title">SONGHO</h1>
+  <p class="screen-sub">Multijoueur en ligne · Ewondo · Cameroun</p>
+
+  <div class="divider">Votre nom</div>
+  <input id="input-name" class="input-field" type="text" placeholder="Entrez votre pseudo…" maxlength="20"/>
+
+  <div class="divider">Nouvelle partie</div>
+  <button id="btn-create" class="btn-primary">✦ Créer une partie</button>
+
+  <div class="divider">Rejoindre</div>
+  <input id="input-gameid" class="input-field" type="text" placeholder="Code de partie (ex: AB12CD)…" maxlength="10" style="text-transform:uppercase"/>
+  <button id="btn-join" class="btn-primary" style="background:linear-gradient(135deg,#2A4D7A,#1A2F4A)">⬥ Rejoindre la partie</button>
+
+  <div id="home-error" style="color:#F08080;font-size:.85rem;margin-top:.8rem;"></div>
+</div>
+
+<!-- ══ ÉCRAN ATTENTE ════════════════════════════════════════════ -->
+<div id="screen-waiting" class="screen hidden">
+  <h1 class="screen-title">SONGHO</h1>
+  <p class="screen-sub">En attente de l'adversaire…</p>
+  <div class="waiting-anim"><span></span><span></span><span></span></div>
+  <p style="font-size:.88rem;color:var(--sable);margin-bottom:1rem;">Partagez ce lien à votre adversaire :</p>
+  <div class="share-box">
+    <input id="share-url" class="share-url" type="text" readonly/>
+    <button class="copy-btn" onclick="copyUrl()">Copier</button>
+  </div>
+  <p style="font-size:.78rem;color:rgba(232,201,154,.5);margin-top:.8rem;">Code : <strong id="share-code" style="color:var(--or)"></strong></p>
+</div>
+
+<!-- ══ ÉCRAN JEU ════════════════════════════════════════════════ -->
+<div id="screen-game" class="hidden">
+  <div class="game-header">
+    <span class="game-title">SONGHO</span>
+    <button id="btn-menu" class="btn-secondary">↩ Quitter</button>
+  </div>
+
+  <!-- Joueurs + connexion -->
+  <div class="players-bar">
+    <div class="player-card north" id="card-north">
+      <div class="conn-dot offline" id="dot-north"></div>
+      <div class="player-name" id="name-north">Nord</div>
+      <div class="player-side-badge">NORD</div>
+    </div>
+    <div class="player-card south" id="card-south">
+      <div class="conn-dot offline" id="dot-south"></div>
+      <div class="player-name" id="name-south">Sud</div>
+      <div class="player-side-badge">SUD</div>
+    </div>
+  </div>
+
+  <!-- Scores -->
+  <div class="score-panel">
+    <div class="score-card north">
+      <div class="score-label">Nord 🔵</div>
+      <div class="score-value" id="score-north">0</div>
+      <div class="score-bar-bg"><div class="score-bar" id="bar-north" style="width:0%"></div></div>
+    </div>
+    <div class="score-card south">
+      <div class="score-label">Sud 🔴</div>
+      <div class="score-value" id="score-south">0</div>
+      <div class="score-bar-bg"><div class="score-bar" id="bar-south" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <!-- Tour -->
+  <div class="turn-indicator waiting-opp" id="turn-indicator">Connexion…</div>
+
+  <!-- Tablier -->
+  <div class="board">
+    <div class="player-label north">← Nord (N6 à N0) →</div>
+    <div class="board-row" id="row-north"></div>
+    <div class="board-divider"></div>
+    <div class="board-row" id="row-south"></div>
+    <div class="player-label south">← Sud (S0 à S6) →</div>
+  </div>
+
+  <!-- Chat -->
+  <div class="chat-box">
+    <div class="chat-header">💬 Chat</div>
+    <div class="chat-messages" id="chat-messages"></div>
+    <div class="chat-input-row">
+      <input id="chat-input" class="chat-input" type="text" placeholder="Message…" maxlength="200"/>
+      <button class="chat-send" id="chat-send">Envoyer</button>
+    </div>
+  </div>
+
+  <!-- Légende -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot legal"></div><span>Coup légal</span></div>
+    <div class="legend-item"><div class="legend-dot last"></div><span>Dernier coup</span></div>
+    <div class="legend-item"><div class="legend-dot granary"></div><span>Grenier (&gt;13)</span></div>
+  </div>
+</div>
+
+<!-- ══ OVERLAY FIN ══════════════════════════════════════════════ -->
+<div id="end-overlay" class="hidden">
+  <div class="end-card">
+    <div class="end-title" id="end-title">Partie terminée</div>
+    <div class="end-detail" id="end-detail"></div>
+    <button onclick="location.reload()" class="btn-primary">↩ Nouvelle partie</button>
+  </div>
+</div>
+
+<!-- ══ Couche animation ══════════════════════════════════════════ -->
+<div id="anim-layer"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════════════════
+const API = 'https://songho-multijoueur.up.railway.app/api'; // Railway backend
+const POLL_INTERVAL  = 1200;  // ms entre chaque poll
+const PING_INTERVAL  = 4000;  // ms entre chaque ping
+
+// ════════════════════════════════════════════════════════════
+// MOTEUR (identique à la v1 — pur JS, côté client pour animation)
+// ════════════════════════════════════════════════════════════
+const RULES = { totalSeeds:70, victoryScore:40, maxNormalSowSeeds:13, lowBoardLimit:10 };
+const CYCLE = [
+  {player:'north',pitIndex:0},{player:'north',pitIndex:1},{player:'north',pitIndex:2},
+  {player:'north',pitIndex:3},{player:'north',pitIndex:4},{player:'north',pitIndex:5},
+  {player:'north',pitIndex:6},{player:'south',pitIndex:6},{player:'south',pitIndex:5},
+  {player:'south',pitIndex:4},{player:'south',pitIndex:3},{player:'south',pitIndex:2},
+  {player:'south',pitIndex:1},{player:'south',pitIndex:0}
+];
+function samePos(a,b){ return a.player===b.player && a.pitIndex===b.pitIndex; }
+function cycleIdx(pos){ return CYCLE.findIndex(p=>samePos(p,pos)); }
+function nextAfter(pos){
+  const s=cycleIdx(pos), r=[];
+  for(let i=1;i<=13;i++) r.push(CYCLE[(s+i)%14]);
+  return r;
+}
+function other(p){ return p==='north'?'south':'north'; }
+function oppPath(player){
+  return (player==='north'?[6,5,4,3,2,1,0]:[0,1,2,3,4,5,6])
+    .map(i=>({player:other(player),pitIndex:i}));
+}
+function oppFirstPit(player){ return player==='north'?{player:'south',pitIndex:6}:{player:'north',pitIndex:0}; }
+function sum(a){ return a.reduce((t,v)=>t+v,0); }
+
+function computeSowPath(board, player, pitIndex){
+  // Retourne uniquement la liste visited pour animer — ne modifie pas le board
+  const seeds = board[player][pitIndex];
+  const visited = [];
+  const path = nextAfter({player, pitIndex});
+  if(seeds <= RULES.maxNormalSowSeeds){
+    for(let i=0;i<seeds;i++) visited.push(path[i]);
+  } else {
+    for(let i=0;i<13;i++) visited.push(path[i]);
+    const op = oppPath(player), fp = oppFirstPit(player);
+    let remaining = seeds - 13;
+    for(let i=0;i<remaining;i++) visited.push(op[i%op.length]);
+  }
+  return visited;
+}
+
+// ════════════════════════════════════════════════════════════
+// ÉTAT LOCAL
+// ════════════════════════════════════════════════════════════
+let session = {
+  gameId: null, token: null, mySide: null,
+};
+let uiState = {
+  lastState: null,        // dernier état serveur connu
+  lastMoveNumber: -1,     // pour détecter les nouveaux coups
+  chatTotal: 0,           // nombre total de msgs reçus
+  isAnimating: false,
+  pollTimer: null,
+  pingTimer: null,
+  endShown: false,
+};
+
+// ════════════════════════════════════════════════════════════
+// API AJAX
+// ════════════════════════════════════════════════════════════
+async function api(action, body={}){
+  try {
+    const r = await fetch(`${API}?action=${action}`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action,...body})
+    });
+    return await r.json();
+  } catch(e) {
+    return {ok:false, error:'Erreur réseau : '+e.message};
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// ACTIONS MENU
+// ════════════════════════════════════════════════════════════
+document.getElementById('btn-create').addEventListener('click', async ()=>{
+  const name = document.getElementById('input-name').value.trim();
+  if(!name){ showHomeError('Veuillez entrer votre pseudo.'); return; }
+  const r = await api('create', {name});
+  if(!r.ok){ showHomeError(r.error); return; }
+  session = {gameId:r.gameId, token:r.token, mySide:r.side};
+  // Construire l'URL de partage côté client
+  const shareUrl = `${window.location.origin}${window.location.pathname}?game=${r.gameId}`;
+  // Mettre à jour l'URL du navigateur
+  window.history.pushState({}, '', `?game=${r.gameId}`);
+  showWaiting(r.gameId, shareUrl);
+  startPolling();
+});
+
+document.getElementById('btn-join').addEventListener('click', async ()=>{
+  const name   = document.getElementById('input-name').value.trim();
+  const gameId = document.getElementById('input-gameid').value.trim().toUpperCase();
+  if(!name){   showHomeError('Veuillez entrer votre pseudo.'); return; }
+  if(!gameId){ showHomeError('Entrez un code de partie.'); return; }
+  const r = await api('join', {name, gameId});
+  if(!r.ok){ showHomeError(r.error); return; }
+  session = {gameId:r.gameId, token:r.token, mySide:r.side};
+  window.history.pushState({}, '', `?game=${r.gameId}`);
+  showGame();
+  startPolling();
+});
+
+document.getElementById('btn-menu').addEventListener('click', ()=>{
+  if(confirm('Quitter la partie ?')) location.reload();
+});
+
+document.getElementById('chat-send').addEventListener('click', sendChat);
+document.getElementById('chat-input').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
+
+async function sendChat(){
+  const inp = document.getElementById('chat-input');
+  const text = inp.value.trim();
+  if(!text) return;
+  inp.value = '';
+  await api('chat', {gameId:session.gameId, token:session.token, text});
+}
+
+// ════════════════════════════════════════════════════════════
+// URL PARAMS — rejoindre depuis un lien
+// ════════════════════════════════════════════════════════════
+(function checkUrlParams(){
+  const params = new URLSearchParams(location.search);
+  const game = params.get('game');
+  if(game) document.getElementById('input-gameid').value = game.toUpperCase();
+})();
+
+// ════════════════════════════════════════════════════════════
+// POLLING
+// ════════════════════════════════════════════════════════════
+function startPolling(){
+  poll();
+  uiState.pollTimer = setInterval(poll, POLL_INTERVAL);
+  uiState.pingTimer = setInterval(()=>{
+    api('ping', {gameId:session.gameId, token:session.token});
+  }, PING_INTERVAL);
+}
+
+async function poll(){
+  const r = await api('poll', {
+    gameId:session.gameId, token:session.token,
+    lastChat:uiState.chatTotal
+  });
+  if(!r.ok) return;
+
+  const state = r.state;
+
+  // Si on était en attente et que Nord vient d'arriver
+  if(document.getElementById('screen-waiting') &&
+     !document.getElementById('screen-waiting').classList.contains('hidden') &&
+     state.status === 'playing'){
+    showGame();
+  }
+
+  // Nouveaux messages chat
+  if(r.chat && r.chat.length > 0){
+    r.chat.forEach(addChatMsg);
+    uiState.chatTotal = r.chatTotal;
+  }
+
+  // Nouveau coup adversaire à animer
+  if(state.moveNumber > uiState.lastMoveNumber && uiState.lastMoveNumber >= 0){
+    const lm = state.lastMove;
+    if(lm && lm.player !== session.mySide && uiState.lastState){
+      // Animer le coup adversaire
+      animateOpponentMove(uiState.lastState, lm.player, lm.pitIndex, ()=>{
+        applyServerState(state);
+        uiState.lastState = state;
+        uiState.lastMoveNumber = state.moveNumber;
+      });
+      return; // on attend la fin de l'animation
+    }
+  }
+
+  applyServerState(state);
+  uiState.lastState = state;
+  uiState.lastMoveNumber = state.moveNumber;
+}
+
+// ════════════════════════════════════════════════════════════
+// CLIC JOUEUR
+// ════════════════════════════════════════════════════════════
+async function onPitClick(player, pitIndex){
+  if(uiState.isAnimating) return;
+  const state = uiState.lastState;
+  if(!state || state.gameStatus !== 'playing') return;
+  if(state.currentPlayer !== session.mySide) return;
+  if(player !== session.mySide){ shakePit(player,pitIndex); return; }
+  if(!state.legalMoves.includes(pitIndex)){ shakePit(player,pitIndex); return; }
+
+  // Animation immédiate côté client
+  uiState.isAnimating = true;
+  const visitedPath = computeSowPath(
+    {north:[...state.board.north], south:[...state.board.south]},
+    player, pitIndex
+  );
+  animateSow(state.board, player, pitIndex, visitedPath, async ()=>{
+    // Envoyer au serveur
+    const r = await api('move', {gameId:session.gameId, token:session.token, pitIndex});
+    uiState.isAnimating = false;
+    if(!r.ok){ showNotif(r.error); poll(); return; }
+    applyServerState(r.state);
+    uiState.lastState   = r.state;
+    uiState.lastMoveNumber = r.state.moveNumber;
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+// ANIMATION SOW
+// ════════════════════════════════════════════════════════════
+function animateOpponentMove(prevState, player, pitIndex, onDone){
+  if(uiState.isAnimating){ onDone(); return; }
+  uiState.isAnimating = true;
+  const board = {north:[...prevState.board.north], south:[...prevState.board.south]};
+  const visited = computeSowPath(board, player, pitIndex);
+  animateSow(board, player, pitIndex, visited, ()=>{
+    uiState.isAnimating = false;
+    onDone();
+  });
+}
+
+function animateSow(board, player, pitIndex, visitedPath, onDone){
+  if(visitedPath.length === 0){ onDone(); return; }
+
+  // Vider source
+  const animBoard = {north:[...board.north], south:[...board.south]};
+  animBoard[player][pitIndex] = 0;
+  renderBoardRaw(animBoard);
+  const srcEl = getPitEl(player, pitIndex);
+  if(srcEl) srcEl.classList.add('sowing-source');
+
+  const FLY = 300, OVERLAP = 0.45, STEP = FLY * (1 - OVERLAP);
+  const origins = [srcEl, ...visitedPath.slice(0,-1).map(p=>getPitEl(p.player,p.pitIndex))];
+
+  visitedPath.forEach((pos, i)=>{
+    const fromEl   = origins[i];
+    const targetEl = getPitEl(pos.player, pos.pitIndex);
+    setTimeout(()=>{
+      animBoard[pos.player][pos.pitIndex]++;
+      if(fromEl && targetEl){
+        flyingSeed(fromEl, targetEl, FLY, ()=>{
+          refreshPit(targetEl, animBoard[pos.player][pos.pitIndex]);
+          targetEl.classList.add('just-received');
+          setTimeout(()=>targetEl.classList.remove('just-received'),280);
+        });
+      } else if(targetEl) refreshPit(targetEl, animBoard[pos.player][pos.pitIndex]);
+
+      if(i === visitedPath.length-1){
+        setTimeout(()=>{ if(srcEl) srcEl.classList.remove('sowing-source'); onDone(); }, FLY+80);
+      }
+    }, i*STEP);
+  });
+}
+
+function flyingSeed(fromEl, toEl, duration, onArrive){
+  const from = center(fromEl), to = center(toEl);
+  const seed = document.createElement('div');
+  seed.className = 'flying-seed';
+  seed.style.cssText = `left:${from.x}px;top:${from.y}px;transform:translate(-50%,-50%)`;
+  document.getElementById('anim-layer').appendChild(seed);
+
+  const dx=to.x-from.x, dy=to.y-from.y, dist=Math.hypot(dx,dy)||1;
+  const arcH = Math.min(dist*.5+18, 65);
+  let px=-dy/dist, py=dx/dist;
+  if(py>0){px=-px;py=-py;}
+  const cx=(from.x+to.x)/2+px*arcH, cy=(from.y+to.y)/2+py*arcH;
+  const t0=performance.now();
+  function ease(t){ return -(Math.cos(Math.PI*t)-1)/2; }
+  function frame(now){
+    const raw=Math.min((now-t0)/duration,1), t=ease(raw), mt=1-t;
+    const bx=mt*mt*from.x+2*mt*t*cx+t*t*to.x;
+    const by=mt*mt*from.y+2*mt*t*cy+t*t*to.y;
+    const sc=0.7+Math.sin(raw*Math.PI)*.55;
+    seed.style.left=bx+'px'; seed.style.top=by+'px';
+    seed.style.transform=`translate(-50%,-50%) scale(${sc}) rotate(${raw*180}deg)`;
+    seed.style.opacity=raw>.75?Math.max(0,1-(raw-.75)/.25):1;
+    if(raw<1) requestAnimationFrame(frame);
+    else{ seed.remove(); if(onArrive) onArrive(); }
+  }
+  requestAnimationFrame(frame);
+}
+
+function center(el){ const r=el.getBoundingClientRect(); return{x:r.left+r.width/2,y:r.top+r.height/2}; }
+
+// ════════════════════════════════════════════════════════════
+// RENDU
+// ════════════════════════════════════════════════════════════
+function applyServerState(state){
+  renderBoard(state);
+  updateScores(state);
+  updatePlayers(state);
+  updateTurnIndicator(state);
+  highlightLegalMoves(state);
+  if(state.lastMove) highlightLastMove(state.lastMove);
+  if(state.gameStatus==='ended' && !uiState.endShown){ uiState.endShown=true; showEnd(state); }
+}
+
+function renderBoard(state){
+  renderRow('north', state.board.north, state.legalMoves, state.currentPlayer, state.board);
+  renderRow('south', state.board.south, state.legalMoves, state.currentPlayer, state.board);
+}
+
+function renderRow(player, seeds, legalMoves, currentPlayer, board){
+  const row = document.getElementById('row-'+player);
+  row.innerHTML = '';
+  const indices = player==='north' ? [6,5,4,3,2,1,0] : [0,1,2,3,4,5,6];
+  indices.forEach(i=>{
+    const s = seeds[i];
+    const pit = document.createElement('div');
+    pit.className = 'pit';
+    pit.dataset.player = player; pit.dataset.index = i;
+    if(s > 13) pit.classList.add('granary');
+    const isMyTurn = session.mySide && currentPlayer===session.mySide;
+    if(!isMyTurn || player!==session.mySide) pit.classList.add('not-my-turn');
+    pit.innerHTML = `<div class="seeds-count">${s}</div><div class="seeds-visual">${renderSeeds(s)}</div>`;
+    pit.addEventListener('click', ()=>onPitClick(player,i));
+    row.appendChild(pit);
+  });
+}
+
+function renderBoardRaw(board){
+  ['north','south'].forEach(player=>{
+    const row = document.getElementById('row-'+player);
+    if(!row) return;
+    const indices = player==='north'?[6,5,4,3,2,1,0]:[0,1,2,3,4,5,6];
+    indices.forEach(i=>{
+      const pit = row.querySelector(`.pit[data-index="${i}"]`);
+      if(pit) refreshPit(pit, board[player][i]);
+    });
+  });
+}
+
+function refreshPit(pitEl, count){
+  if(!pitEl) return;
+  const c=pitEl.querySelector('.seeds-count'), v=pitEl.querySelector('.seeds-visual');
+  if(c) c.textContent=count;
+  if(v) v.innerHTML=renderSeeds(count);
+}
+
+function renderSeeds(count){
+  const d=Math.min(count,12);
+  return Array.from({length:d},()=>`<span class="seed"></span>`).join('')+
+         (count>12?`<span class="seed-overflow">+${count-12}</span>`:'');
+}
+
+function updateScores(state){
+  document.getElementById('score-north').textContent = state.scores.north;
+  document.getElementById('score-south').textContent = state.scores.south;
+  document.getElementById('bar-north').style.width = Math.min(state.scores.north/40*100,100)+'%';
+  document.getElementById('bar-south').style.width = Math.min(state.scores.south/40*100,100)+'%';
+}
+
+function updatePlayers(state){
+  ['north','south'].forEach(side=>{
+    const p = state.players[side];
+    if(!p) return;
+    document.getElementById('name-'+side).textContent = p.name;
+    const dot = document.getElementById('dot-'+side);
+    dot.className = 'conn-dot ' + (p.connected ? 'online' : 'offline');
+    const card = document.getElementById('card-'+side);
+    if(side===session.mySide) card.classList.add('me'); else card.classList.remove('me');
+  });
+}
+
+function updateTurnIndicator(state){
+  const el = document.getElementById('turn-indicator');
+  if(state.status==='waiting'){
+    el.textContent = 'En attente de l\'adversaire…';
+    el.className = 'turn-indicator waiting-opp'; return;
+  }
+  if(state.gameStatus==='ended'){ el.textContent='Partie terminée'; el.className='turn-indicator waiting-opp'; return; }
+  const isMyTurn = state.currentPlayer===session.mySide;
+  if(isMyTurn){
+    el.textContent='🟢 À votre tour de jouer';
+    el.className='turn-indicator '+(session.mySide||'south');
+  } else {
+    const name = state.players[state.currentPlayer]?.name || state.currentPlayer;
+    el.textContent=`⏳ En attente de ${name}…`;
+    el.className='turn-indicator waiting-opp';
+  }
+}
+
+function highlightLegalMoves(state){
+  document.querySelectorAll('.pit').forEach(p=>p.classList.remove('legal'));
+  if(!state || state.currentPlayer!==session.mySide || state.gameStatus!=='playing') return;
+  state.legalMoves.forEach(i=>{
+    const el=getPitEl(session.mySide, i);
+    if(el) el.classList.add('legal');
+  });
+}
+
+function highlightLastMove(lm){
+  document.querySelectorAll('.pit.last-moved').forEach(p=>p.classList.remove('last-moved'));
+  const el=getPitEl(lm.player, lm.pitIndex);
+  if(el) el.classList.add('last-moved');
+}
+
+function getPitEl(player, pitIndex){
+  return document.querySelector(`.pit[data-player="${player}"][data-index="${pitIndex}"]`);
+}
+
+function shakePit(player, pitIndex){
+  const el=getPitEl(player,pitIndex);
+  if(!el) return;
+  el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'),500);
+}
+
+// ════════════════════════════════════════════════════════════
+// CHAT
+// ════════════════════════════════════════════════════════════
+function addChatMsg(msg){
+  const box = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + (msg.sys ? 'sys' : (msg.side||''));
+  if(msg.sys){
+    div.innerHTML = msg.text;
+  } else {
+    div.innerHTML = `<span class="msg-name">${msg.name} : </span><span class="msg-text">${msg.text}</span>`;
+  }
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+// ════════════════════════════════════════════════════════════
+// FIN DE PARTIE
+// ════════════════════════════════════════════════════════════
+function showEnd(state){
+  const title  = document.getElementById('end-title');
+  const detail = document.getElementById('end-detail');
+  if(state.winner==='draw'){
+    title.textContent = 'Égalité !';
+  } else {
+    const name = state.players[state.winner]?.name || state.winner;
+    const isMe = state.winner===session.mySide;
+    title.textContent = isMe ? '🏆 Vous gagnez !' : `${name} gagne !`;
+  }
+  detail.textContent = `${state.scores.north} – ${state.scores.south} graines`;
+  document.getElementById('end-overlay').classList.remove('hidden');
+}
+
+// ════════════════════════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════════════════════════
+function showWaiting(gameId, url){
+  document.getElementById('screen-home').classList.add('hidden');
+  document.getElementById('screen-waiting').classList.remove('hidden');
+  document.getElementById('share-url').value = url;
+  document.getElementById('share-code').textContent = gameId;
+}
+
+function showGame(){
+  document.getElementById('screen-home').classList.add('hidden');
+  document.getElementById('screen-waiting').classList.add('hidden');
+  document.getElementById('screen-game').classList.remove('hidden');
+}
+
+function showHomeError(msg){
+  document.getElementById('home-error').textContent = msg;
+}
+
+function copyUrl(){
+  const u = document.getElementById('share-url');
+  u.select(); document.execCommand('copy');
+  showNotif('Lien copié !');
+}
+
+function showNotif(msg){
+  const n = document.createElement('div');
+  n.className='notif'; n.textContent=msg;
+  document.body.appendChild(n);
+  setTimeout(()=>n.remove(), 3000);
+}
+</script>
+</body>
+</html>
